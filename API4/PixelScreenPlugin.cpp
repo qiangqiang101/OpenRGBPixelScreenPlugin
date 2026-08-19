@@ -411,6 +411,7 @@ void PixelScreenPlugin::LoadSettings()
                     if (j.contains("padding_y")) dev_s.padding_y = j["padding_y"];
                     if (j.contains("text_align")) dev_s.text_align = j["text_align"];
                     if (j.contains("sensor_format")) dev_s.sensor_format = j["sensor_format"];
+                    if (j.contains("lhm_url")) dev_s.lhm_url = j["lhm_url"];
                     if (j.contains("sensor_update_interval")) dev_s.sensor_update_interval = j["sensor_update_interval"];
 
                     settings.device_settings[dev_name] = dev_s;
@@ -461,6 +462,7 @@ void PixelScreenPlugin::SaveSettings()
             j["padding_y"] = dev_s.padding_y;
             j["text_align"] = dev_s.text_align;
             j["sensor_format"] = dev_s.sensor_format;
+            j["lhm_url"] = dev_s.lhm_url;
             j["sensor_update_interval"] = dev_s.sensor_update_interval;
 
             devices_json[pair.first] = j;
@@ -749,15 +751,15 @@ void PixelScreenPlugin::AdvanceAnimation(DeviceMatrixSettings& dev_s)
     dev_s.animation_accumulator -= consumed_time;
     const float distance = static_cast<float>((dev_s.scroll_speed / 2.0) * consumed_time);
 
-    if (dev_s.scroll_direction == "Left")
+    if (dev_s.scroll_direction == "Left" || dev_s.scroll_direction == "Up")
     {
         dev_s.scroll_offset -= distance;
     }
-    else if (dev_s.scroll_direction == "Right")
+    else if (dev_s.scroll_direction == "Right" || dev_s.scroll_direction == "Down")
     {
         dev_s.scroll_offset += distance;
     }
-    else if (dev_s.scroll_direction == "Ping-Pong")
+    else if (dev_s.scroll_direction == "Ping-Pong" || dev_s.scroll_direction == "Ping-Pong Up down" || dev_s.scroll_direction == "Ping-Pong Up Down")
     {
         dev_s.scroll_offset += distance * dev_s.ping_pong_direction;
     }
@@ -881,6 +883,7 @@ void PixelScreenPlugin::OnSensorTimerTimeout()
 {
     if (!sensor_manager) return;
 
+    std::string lhm_url = "http://127.0.0.1:8085/data.json";
     // Only run curl/fetchSensors if at least one enabled device is set to "Sensor Data" mode (display_mode == 4)
     {
         std::lock_guard<std::mutex> settings_lock(settings_mutex);
@@ -890,6 +893,10 @@ void PixelScreenPlugin::OnSensorTimerTimeout()
             if (pair.second.enabled && pair.second.display_mode == 4)
             {
                 sensor_mode_enabled = true;
+                if (!pair.second.lhm_url.empty())
+                {
+                    lhm_url = pair.second.lhm_url;
+                }
                 break;
             }
         }
@@ -897,7 +904,7 @@ void PixelScreenPlugin::OnSensorTimerTimeout()
         if (!sensor_mode_enabled) return;
     }
 
-    sensor_manager->fetchSensors();
+    sensor_manager->fetchSensors(lhm_url);
 }
 
 void PixelScreenPlugin::OverlayTextOnBuffer(const MatrixZoneTarget& target,
@@ -966,8 +973,9 @@ void PixelScreenPlugin::OverlayTextOnBuffer(const MatrixZoneTarget& target,
                 if (custom_glyph.width > 0 && custom_glyph.height > 0)
                 {
                     std::vector<RenderedGlyph> rendered_glyphs;
-                    rendered_glyphs.push_back({custom_glyph, 0});
+                    rendered_glyphs.push_back({custom_glyph, 0, 0, false});
                     int total_width = custom_glyph.width;
+                    int total_height = custom_glyph.height;
 
                     const unsigned int matrix_w = target.matrix_width;
                     const unsigned int matrix_h = target.matrix_height;
@@ -976,10 +984,20 @@ void PixelScreenPlugin::OverlayTextOnBuffer(const MatrixZoneTarget& target,
                     
                     if (matrix_w == 0 || matrix_h == 0 || !map) return;
 
+                    bool is_vert_scroll = (dev_s.scroll_direction == "Up" || dev_s.scroll_direction == "Down" ||
+                                           dev_s.scroll_direction == "Ping-Pong Up down" || dev_s.scroll_direction == "Ping-Pong Up Down");
+                    bool is_horiz_scroll = (dev_s.scroll_direction == "Left" || dev_s.scroll_direction == "Right" || dev_s.scroll_direction == "Ping-Pong");
+
                     int buffer_width = total_width;
-                    if (dev_s.scroll_direction != "Off" && dev_s.scroll_direction != "Ping-Pong")
+                    if (dev_s.scroll_direction == "Left" || dev_s.scroll_direction == "Right")
                     {
                         buffer_width += matrix_w / 2;
+                    }
+
+                    int buffer_height = total_height;
+                    if (dev_s.scroll_direction == "Up" || dev_s.scroll_direction == "Down")
+                    {
+                        buffer_height += matrix_h / 2;
                     }
                     
                     if (dev_s.scroll_direction == "Ping-Pong")
@@ -998,16 +1016,50 @@ void PixelScreenPlugin::OverlayTextOnBuffer(const MatrixZoneTarget& target,
                             dev_s.ping_pong_direction = -1;
                         }
                     }
-                    else if (dev_s.scroll_direction != "Off")
+                    else if (dev_s.scroll_direction == "Ping-Pong Up down" || dev_s.scroll_direction == "Ping-Pong Up Down")
+                    {
+                        float min_offset = (float)matrix_h - (float)buffer_height;
+                        if (min_offset > 0.0f) min_offset = 0.0f;
+
+                        if (dev_s.scroll_offset <= min_offset)
+                        {
+                            dev_s.scroll_offset = min_offset;
+                            dev_s.ping_pong_direction = 1;
+                        }
+                        else if (dev_s.scroll_offset >= 0.0f)
+                        {
+                            dev_s.scroll_offset = 0.0f;
+                            dev_s.ping_pong_direction = -1;
+                        }
+                    }
+                    else if (is_horiz_scroll)
                     {
                         if (dev_s.scroll_offset <= -buffer_width) dev_s.scroll_offset += buffer_width;
                         if (dev_s.scroll_offset >= buffer_width) dev_s.scroll_offset -= buffer_width;
+                    }
+                    else if (is_vert_scroll)
+                    {
+                        if (dev_s.scroll_offset <= -buffer_height) dev_s.scroll_offset += buffer_height;
+                        if (dev_s.scroll_offset >= buffer_height) dev_s.scroll_offset -= buffer_height;
                     }
                     else
                     {
                         dev_s.scroll_offset = 0.0f;
                     }
                     
+                    int screen_align = 0;
+                    if (!is_horiz_scroll)
+                    {
+                        if (dev_s.text_align == 1)      // Center
+                        {
+                            screen_align = ((int)matrix_w - total_width) / 2;
+                        }
+                        else if (dev_s.text_align == 2) // End
+                        {
+                            screen_align = (int)matrix_w - total_width;
+                        }
+                    }
+
                     RGBColor text_color = ToRGBColor(dev_s.text_r, dev_s.text_g, dev_s.text_b);
                     
                     for (unsigned int y = 0; y < matrix_h; y++)
@@ -1018,9 +1070,9 @@ void PixelScreenPlugin::OverlayTextOnBuffer(const MatrixZoneTarget& target,
                             if (led_idx == 0xFFFFFFFF) continue;
                             
                             int src_x;
-                            if (dev_s.scroll_direction == "Off")
+                            if (!is_horiz_scroll)
                             {
-                                src_x = (int)x;
+                                src_x = (int)x - screen_align;
                             }
                             else
                             {
@@ -1028,24 +1080,34 @@ void PixelScreenPlugin::OverlayTextOnBuffer(const MatrixZoneTarget& target,
                                 if (src_x < 0) src_x += buffer_width;
                             }
                             
-                            int src_y = (int)y - dev_s.padding_y;
+                            int src_y;
+                            if (!is_vert_scroll)
+                            {
+                                src_y = (int)y;
+                            }
+                            else
+                            {
+                                src_y = (int)std::floor((float)y - dev_s.scroll_offset) % buffer_height;
+                                if (src_y < 0) src_y += buffer_height;
+                            }
+
                             src_x = src_x - dev_s.padding_x;
+                            src_y = src_y - dev_s.padding_y;
                             
                             bool pixel_on = false;
                             
-                            if (src_x >= 0 && src_x < total_width)
+                            if (src_x >= 0 && src_x < total_width && src_y >= 0 && src_y < total_height)
                             {
                                 for (const auto& rg : rendered_glyphs)
                                 {
                                     int local_x = src_x - rg.offset_x;
-                                    if (local_x >= 0 && local_x < (int)rg.glyph.width)
+                                    int local_y = src_y - rg.offset_y;
+                                    if (local_x >= 0 && local_x < (int)rg.glyph.width &&
+                                        local_y >= 0 && local_y < (int)rg.glyph.height)
                                     {
-                                        if (src_y >= 0 && src_y < (int)rg.glyph.height)
+                                        if (rg.glyph.grid[local_y][local_x] > 0)
                                         {
-                                            if (rg.glyph.grid[src_y][local_x] > 0)
-                                            {
-                                                pixel_on = true;
-                                            }
+                                            pixel_on = true;
                                         }
                                         break;
                                     }
@@ -1158,10 +1220,23 @@ void PixelScreenPlugin::OverlayTextOnBuffer(const MatrixZoneTarget& target,
     
     if (matrix_w == 0 || matrix_h == 0 || !map) return;
     
+    bool is_vert_scroll = (dev_s.scroll_direction == "Up" || dev_s.scroll_direction == "Down" ||
+                           dev_s.scroll_direction == "Ping-Pong Up down" || dev_s.scroll_direction == "Ping-Pong Up Down");
+    bool is_horiz_scroll = (dev_s.scroll_direction == "Left" || dev_s.scroll_direction == "Right" || dev_s.scroll_direction == "Ping-Pong");
+
+    int total_height = lines.empty() ? glyph_h : static_cast<int>((lines.size() - 1) * line_spacing + glyph_h);
+    if (total_height <= 0) total_height = 1;
+
     int buffer_width = total_width;
-    if (dev_s.scroll_direction != "Off" && dev_s.scroll_direction != "Ping-Pong")
+    if (dev_s.scroll_direction == "Left" || dev_s.scroll_direction == "Right")
     {
         buffer_width += matrix_w / 2;
+    }
+
+    int buffer_height = total_height;
+    if (dev_s.scroll_direction == "Up" || dev_s.scroll_direction == "Down")
+    {
+        buffer_height += matrix_h / 2;
     }
     
     if (dev_s.scroll_direction == "Ping-Pong")
@@ -1180,13 +1255,39 @@ void PixelScreenPlugin::OverlayTextOnBuffer(const MatrixZoneTarget& target,
             dev_s.ping_pong_direction = -1;
         }
     }
-    else if (dev_s.scroll_direction != "Off")
+    else if (dev_s.scroll_direction == "Ping-Pong Up down" || dev_s.scroll_direction == "Ping-Pong Up Down")
+    {
+        float min_offset = (float)matrix_h - (float)buffer_height;
+        if (min_offset > 0.0f) min_offset = 0.0f;
+
+        if (dev_s.scroll_offset <= min_offset)
+        {
+            dev_s.scroll_offset = min_offset;
+            dev_s.ping_pong_direction = 1;
+        }
+        else if (dev_s.scroll_offset >= 0.0f)
+        {
+            dev_s.scroll_offset = 0.0f;
+            dev_s.ping_pong_direction = -1;
+        }
+    }
+    else if (is_horiz_scroll)
     {
         if (dev_s.scroll_offset <= -buffer_width) dev_s.scroll_offset += buffer_width;
         if (dev_s.scroll_offset >= buffer_width) dev_s.scroll_offset -= buffer_width;
     }
+    else if (is_vert_scroll)
+    {
+        if (dev_s.scroll_offset <= -buffer_height) dev_s.scroll_offset += buffer_height;
+        if (dev_s.scroll_offset >= buffer_height) dev_s.scroll_offset -= buffer_height;
+    }
+    else
+    {
+        dev_s.scroll_offset = 0.0f;
+    }
+
     int screen_align = 0;
-    if (dev_s.scroll_direction == "Off")
+    if (!is_horiz_scroll)
     {
         if (dev_s.text_align == 1)      // Center
         {
@@ -1208,7 +1309,7 @@ void PixelScreenPlugin::OverlayTextOnBuffer(const MatrixZoneTarget& target,
             if (led_idx == 0xFFFFFFFF) continue;
             
             int src_x;
-            if (dev_s.scroll_direction == "Off")
+            if (!is_horiz_scroll)
             {
                 src_x = (int)x - screen_align;
             }
@@ -1218,8 +1319,19 @@ void PixelScreenPlugin::OverlayTextOnBuffer(const MatrixZoneTarget& target,
                 if (src_x < 0) src_x += buffer_width;
             }
             
-            int src_y = (int)y - dev_s.padding_y;
+            int src_y;
+            if (!is_vert_scroll)
+            {
+                src_y = (int)y;
+            }
+            else
+            {
+                src_y = (int)std::floor((float)y - dev_s.scroll_offset) % buffer_height;
+                if (src_y < 0) src_y += buffer_height;
+            }
+
             src_x = src_x - dev_s.padding_x;
+            src_y = src_y - dev_s.padding_y;
             
             bool pixel_on = false;
             

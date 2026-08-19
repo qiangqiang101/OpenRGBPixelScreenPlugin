@@ -53,6 +53,7 @@ struct DeviceMatrixSettings
     std::string custom_text = "OpenRGB";
     std::string time_format = "hh:mm tt";
     std::string sensor_format = "CPU: [CPU\\Load\\CPU Total]";
+    std::string lhm_url = "http://127.0.0.1:8085/data.json";
     int sensor_update_interval = 1000; // ms: 250, 500, 1000, 2000
     std::string pixel_art_json = "[ [1, 0, 0, 1], [0, 1, 1, 0], [0, 1, 1, 0], [1, 0, 0, 1] ]"; // 2D Pixel Art Matrix JSON
     std::string scroll_direction = "Left"; // "Off", "Left", "Right", "Ping-Pong"

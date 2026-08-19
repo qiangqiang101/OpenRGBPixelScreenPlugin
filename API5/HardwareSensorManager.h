@@ -77,15 +77,28 @@ public:
         }
     }
 
+    void setLhmUrl(const std::string& url)
+    {
+        if (!url.empty())
+        {
+            lhm_url = url;
+        }
+    }
+
+    std::string getLhmUrl() const
+    {
+        return lhm_url;
+    }
+
     // Kick off an async sensor fetch. Emits sensorDataUpdated() on success,
     // sensorFetchError() on failure.
-    void fetchSensors()
+    void fetchSensors(const std::string& url = "")
     {
         if (is_shutting_down || (qApp && QCoreApplication::closingDown()))
             return;
 
 #ifdef _WIN32
-        fetchLHMViaCurl();
+        fetchLHMViaCurl(url);
 #else
         fetchLinux();
         emit sensorDataUpdated();
@@ -173,9 +186,11 @@ private:
         sensor_list.push_back({path, value});
     }
 
+    std::string lhm_url = "http://127.0.0.1:8085/data.json";
+
 #ifdef _WIN32
     // ── Windows: LibreHardwareMonitor via curl (built-in on Win10+) ──────────
-    void fetchLHMViaCurl()
+    void fetchLHMViaCurl(const std::string& url = "")
     {
         if (is_shutting_down || (qApp && QCoreApplication::closingDown()))
             return;
@@ -224,10 +239,13 @@ private:
             }
         });
 
+        std::string target_url = url.empty() ? lhm_url : url;
+        if (target_url.empty()) target_url = "http://127.0.0.1:8085/data.json";
+
         // curl flags: silent, fail on HTTP error, 2-second timeouts
         current_proc->start("curl", QStringList()
                     << "-s" << "--fail" << "--connect-timeout" << "2" << "--max-time" << "2"
-                    << "http://127.0.0.1:8085/data.json");
+                    << QString::fromStdString(target_url));
     }
 
     void parseLHMJson(const QByteArray& data)

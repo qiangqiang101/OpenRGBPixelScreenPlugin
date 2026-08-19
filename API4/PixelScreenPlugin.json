@@ -2,10 +2,10 @@
     "Id" : "org.openrgb.pixelscreenplugin",
     "Name" : "OpenRGB Pixel Screen Plugin",
     "VendorId" : "openrgb",
-    "Version" : "0.9.12",
-    "VersionStr" : "0.9+ (git12)",
+    "Version" : "0.9.19",
+    "VersionStr" : "0.9+ (git19)",
     "Url" : "https://github.com/qiangqiang101/OpenRGBPixelScreenPlugin",
-    "Commit" : "f7ccb7a23016a6d43712a04843620b81f8dd4a8c",
+    "Commit" : "5abd6eba19329268f6edf302b00905936cac99a3",
     "Description" : "Render custom scrolling text, clock, sensors, and pixel art on OpenRGB matrices",
     "OpenRGBPluginAPIVersion" : 4
 }

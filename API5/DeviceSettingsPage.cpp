@@ -65,6 +65,10 @@ DeviceSettingsPage::DeviceSettingsPage(PixelScreenPlugin* plugin_ptr, const std:
     sensorFormatEdit->setMaximumHeight(65);
     formLayout->addRow("Sensor Format:", sensorFormatEdit);
 
+    lhmUrlEdit = new QLineEdit(settingsGroupBox);
+    lhmUrlEdit->setPlaceholderText("http://127.0.0.1:8085/data.json");
+    formLayout->addRow("LHM Server URL:", lhmUrlEdit);
+
     // 6. Sensor Picker Row
     sensorComboBox = new QComboBox(settingsGroupBox);
     sensorComboBox->setMinimumWidth(300);
@@ -134,6 +138,9 @@ DeviceSettingsPage::DeviceSettingsPage(PixelScreenPlugin* plugin_ptr, const std:
     scrollDirCombo->addItem("Left");
     scrollDirCombo->addItem("Right");
     scrollDirCombo->addItem("Ping-Pong");
+    scrollDirCombo->addItem("Up");
+    scrollDirCombo->addItem("Down");
+    scrollDirCombo->addItem("Ping-Pong Up down");
     formLayout->addRow("Scroll Direction:", scrollDirCombo);
 
     // Scroll Speed
@@ -190,6 +197,7 @@ DeviceSettingsPage::DeviceSettingsPage(PixelScreenPlugin* plugin_ptr, const std:
     connect(customTextEdit, &QTextEdit::textChanged, this, &DeviceSettingsPage::on_customTextEdit_textChanged);
     connect(timeFormatEdit, &QTextEdit::textChanged, this, &DeviceSettingsPage::on_timeFormatEdit_textChanged);
     connect(sensorFormatEdit, &QTextEdit::textChanged, this, &DeviceSettingsPage::on_sensorFormatEdit_textChanged);
+    connect(lhmUrlEdit, &QLineEdit::textChanged, this, &DeviceSettingsPage::on_lhmUrlEdit_textChanged);
     connect(sensorRefreshButton, &QPushButton::clicked, this, &DeviceSettingsPage::on_sensorRefreshButton_clicked);
     connect(sensorAddButton, &QPushButton::clicked, this, &DeviceSettingsPage::on_sensorAddButton_clicked);
     connect(sensorInterval250Radio,  &QRadioButton::toggled, this, &DeviceSettingsPage::on_sensorIntervalRadio_toggled);
@@ -250,6 +258,7 @@ void DeviceSettingsPage::LoadSettingsToPage()
     customTextEdit->setPlainText(QString::fromStdString(dev_s.custom_text));
     timeFormatEdit->setPlainText(QString::fromStdString(dev_s.time_format));
     sensorFormatEdit->setPlainText(QString::fromStdString(dev_s.sensor_format));
+    lhmUrlEdit->setText(QString::fromStdString(dev_s.lhm_url.empty() ? "http://127.0.0.1:8085/data.json" : dev_s.lhm_url));
     pixelArtEdit->setPlainText(QString::fromStdString(dev_s.pixel_art_json));
 
     // Sensor interval radios
@@ -283,6 +292,7 @@ void DeviceSettingsPage::LoadSettingsToPage()
 void DeviceSettingsPage::UpdateSensorUI(bool sensor_mode)
 {
     sensorFormatEdit->setEnabled(sensor_mode);
+    lhmUrlEdit->setEnabled(sensor_mode);
     sensorComboBox->setEnabled(sensor_mode);
     sensorAddButton->setEnabled(sensor_mode);
     sensorRefreshButton->setEnabled(sensor_mode);
@@ -372,6 +382,16 @@ void DeviceSettingsPage::on_sensorFormatEdit_textChanged()
     });
 }
 
+void DeviceSettingsPage::on_lhmUrlEdit_textChanged()
+{
+    if (loading_ui) return;
+    const std::string url = lhmUrlEdit->text().toStdString();
+    plugin->UpdateDeviceSettings(device_name, [url](DeviceMatrixSettings& settings)
+    {
+        settings.lhm_url = url;
+    });
+}
+
 void DeviceSettingsPage::on_sensorIntervalRadio_toggled()
 {
     if (loading_ui) return;
@@ -395,7 +415,10 @@ void DeviceSettingsPage::on_sensorRefreshButton_clicked()
     sensorStatusLabel->setText("Refreshing...");
     sensorStatusLabel->setStyleSheet("color: gray; font-style: italic;");
     if (HardwareSensorManager* sensor_manager = plugin->GetSensorManager())
-        sensor_manager->fetchSensors();
+    {
+        const DeviceMatrixSettings dev_s = plugin->GetDeviceSettings(device_name);
+        sensor_manager->fetchSensors(dev_s.lhm_url);
+    }
 }
 
 void DeviceSettingsPage::on_sensorAddButton_clicked()

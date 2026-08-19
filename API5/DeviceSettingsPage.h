@@ -13,6 +13,7 @@
 #include <QWidget>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QLineEdit>
 #include <QTextEdit>
 #include <QSlider>
 #include <QSpinBox>
@@ -39,6 +40,7 @@ private slots:
     void on_customTextEdit_textChanged();
     void on_timeFormatEdit_textChanged();
     void on_sensorFormatEdit_textChanged();
+    void on_lhmUrlEdit_textChanged();
     void on_sensorIntervalRadio_toggled();
     void on_sensorRefreshButton_clicked();
     void on_sensorAddButton_clicked();
@@ -66,6 +68,7 @@ private:
     QTextEdit   *timeFormatEdit;
     // Sensor UI
     QTextEdit   *sensorFormatEdit;
+    QLineEdit   *lhmUrlEdit;
     QComboBox   *sensorComboBox;
     QPushButton *sensorAddButton;
     QPushButton *sensorRefreshButton;
