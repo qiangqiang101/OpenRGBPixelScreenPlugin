@@ -191,7 +191,7 @@ DeviceSettingsPage::DeviceSettingsPage(PixelScreenPlugin* plugin_ptr, const std:
     mainLayout->addStretch(1);
 
     // Signal connections
-    connect(enabledCheck, &QCheckBox::checkStateChanged, this, &DeviceSettingsPage::on_enabledCheck_stateChanged);
+    connect(enabledCheck, &QCheckBox::stateChanged, this, &DeviceSettingsPage::on_enabledCheck_stateChanged);
     connect(displayModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &DeviceSettingsPage::on_displayModeCombo_currentIndexChanged);
     connect(fontSizeCombo, &QComboBox::currentTextChanged, this, &DeviceSettingsPage::on_fontSizeCombo_currentTextChanged);
     connect(customTextEdit, &QTextEdit::textChanged, this, &DeviceSettingsPage::on_customTextEdit_textChanged);
@@ -212,7 +212,7 @@ DeviceSettingsPage::DeviceSettingsPage(PixelScreenPlugin* plugin_ptr, const std:
     connect(scrollSpeedSlider, &QSlider::valueChanged, this, &DeviceSettingsPage::on_scrollSpeedSlider_valueChanged);
     connect(textColorButton, &QPushButton::clicked, this, &DeviceSettingsPage::on_textColorButton_clicked);
     connect(fpsSlider, &QSlider::valueChanged, this, &DeviceSettingsPage::on_fpsSlider_valueChanged);
-    connect(invertColorCheck, &QCheckBox::checkStateChanged, this, &DeviceSettingsPage::on_invertColorCheck_stateChanged);
+    connect(invertColorCheck, &QCheckBox::stateChanged, this, &DeviceSettingsPage::on_invertColorCheck_stateChanged);
     connect(paddingXSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, &DeviceSettingsPage::on_paddingXSpin_valueChanged);
     connect(paddingYSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, &DeviceSettingsPage::on_paddingYSpin_valueChanged);
 

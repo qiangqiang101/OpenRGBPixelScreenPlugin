@@ -100,6 +100,7 @@ public:
 #ifdef _WIN32
         fetchLHMViaCurl(url);
 #else
+        (void)url;
         fetchLinux();
         emit sensorDataUpdated();
 #endif
