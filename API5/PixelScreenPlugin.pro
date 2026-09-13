@@ -14,8 +14,8 @@ CONFIG +=                                                                       
     plugin                                                                                      \
     silent
 
-MAJOR       = 0
-MINOR       = 9
+MAJOR       = 1
+MINOR       = 0
 SUFFIX      = git
 
 COMMITS     = $$system("git rev-list --count HEAD")

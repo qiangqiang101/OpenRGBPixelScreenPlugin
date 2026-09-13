@@ -37,10 +37,7 @@ struct Glyph
 struct MatrixZoneTarget
 {
     RGBController* controller;
-    unsigned int start_idx;
-    unsigned int matrix_width;
-    unsigned int matrix_height;
-    std::vector<unsigned int> matrix_map;
+    unsigned int zone_idx;
     std::string display_name;
 };
 
@@ -160,12 +157,12 @@ private:
     std::vector<RGBController*>        hooked_controllers;
     
     // Font databases loaded from JSON
-    std::map<char, Glyph>               small_letters;
-    std::map<char, Glyph>               letters;
-    std::map<char, Glyph>               large_letters;
-    std::map<char, Glyph>               digits;
-    std::map<char, Glyph>               small_digits;
-    std::map<char, Glyph>               large_digits;
+    std::map<std::string, Glyph>        small_letters;
+    std::map<std::string, Glyph>        letters;
+    std::map<std::string, Glyph>        large_letters;
+    std::map<std::string, Glyph>        digits;
+    std::map<std::string, Glyph>        small_digits;
+    std::map<std::string, Glyph>        large_digits;
     std::map<std::string, Glyph>        zh_font;
 
     void                                LoadFonts();
