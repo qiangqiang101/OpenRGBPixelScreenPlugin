@@ -1,4 +1,4 @@
-# Pixel Screen Plugin
+# OpenRGB像素屏插件
 ![Github All Releases](https://img.shields.io/github/downloads/qiangqiang101/OpenRGBPixelScreenPlugin/total.svg)
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/qiangqiang101/OpenRGBPixelScreenPlugin)
 ![GitHub](https://img.shields.io/github/license/qiangqiang101/OpenRGBPixelScreenPlugin)
@@ -18,7 +18,7 @@
 在 OpenRGB 像素屏上渲染自定义滚动文字、时钟、硬件传感器和像素艺术。
 
 # 🛠️ 下载
-## OpenRGB 0.9+ Pipeline/Next（插件 API 版本 5）
+## OpenRGB 1.0（插件 API 版本 5）
 - [Windows 64](https://github.com/qiangqiang101/OpenRGBPixelScreenPlugin/releases)
 - [Linux amd64](https://github.com/qiangqiang101/OpenRGBPixelScreenPlugin/releases)
 - [Linux arm64](https://github.com/qiangqiang101/OpenRGBPixelScreenPlugin/releases)

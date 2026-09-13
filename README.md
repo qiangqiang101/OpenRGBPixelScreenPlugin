@@ -1,4 +1,4 @@
-# Pixel Screen Plugin
+# OpenRGB Pixel Screen Plugin
 ![Github All Releases](https://img.shields.io/github/downloads/qiangqiang101/OpenRGBPixelScreenPlugin/total.svg)
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/qiangqiang101/OpenRGBPixelScreenPlugin)
 ![GitHub](https://img.shields.io/github/license/qiangqiang101/OpenRGBPixelScreenPlugin)
@@ -18,7 +18,7 @@
 Render custom scrolling text, clock, hardware sensors and pixel art on OpenRGB matrices.
 
 # 🛠️ Download
-## OpenRGB 0.9+ Pipeline/Next (Plugin API Version 5)
+## OpenRGB 1.0 (Plugin API Version 5)
 - [Windows 64](https://github.com/qiangqiang101/OpenRGBPixelScreenPlugin/releases)
 - [Linux amd64](https://github.com/qiangqiang101/OpenRGBPixelScreenPlugin/releases)
 - [Linux arm64](https://github.com/qiangqiang101/OpenRGBPixelScreenPlugin/releases)
