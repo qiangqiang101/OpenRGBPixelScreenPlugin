@@ -39,6 +39,9 @@ struct MatrixZoneTarget
     RGBControllerInterface* controller;
     unsigned int zone_idx;
     std::string display_name;
+    // Owned snapshot: never call locking zone getters from a device-send hook.
+    matrix_map_type matrix_map;
+    unsigned int start_idx = 0;
 };
 
 // Per-device matrix settings structure
@@ -139,7 +142,7 @@ public:
             std::lock_guard<std::mutex> lock(settings_mutex);
             update(settings.GetForDevice(display_name));
         }
-        SaveSettings();
+        if (save_timer) save_timer->start();
     }
 
 public slots:
@@ -155,12 +158,16 @@ public:
     static OpenRGBPluginAPIInterface*   api;
 
 private:
+    friend struct PixelScreenRegressionTests;
     /*-----------------------------------------------------*\
     | User interface widget                                 |
     \*-----------------------------------------------------*/
     PixelScreenTab*                     ui = nullptr;
     HardwareSensorManager*              sensor_manager = nullptr;
     QTimer*                             sensor_timer = nullptr;
+    QTimer*                             save_timer = nullptr;
+    QTimer*                             controller_timer = nullptr;
+    bool                                loaded = false;
     MatrixTextSettings                  settings;
     std::mutex                          settings_mutex;
     std::vector<MatrixZoneTarget>       matrix_zones;

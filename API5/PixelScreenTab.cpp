@@ -29,9 +29,21 @@ PixelScreenTab::~PixelScreenTab()
 
 void PixelScreenTab::UpdateDeviceList()
 {
-    ui->deviceTabWidget->clear();
+    const auto names = plugin->GetMatrixZoneNames();
+    bool unchanged = ui->deviceTabWidget->count() == static_cast<int>(names.size());
+    for (int i = 0; unchanged && i < ui->deviceTabWidget->count(); ++i)
+        unchanged = ui->deviceTabWidget->tabText(i) == QString::fromStdString(names[i]);
+    if (unchanged) return;
 
-    for (const std::string& display_name : plugin->GetMatrixZoneNames())
+    // QTabWidget::clear() does not delete pages or their signal connections.
+    while (ui->deviceTabWidget->count())
+    {
+        QWidget* page = ui->deviceTabWidget->widget(0);
+        ui->deviceTabWidget->removeTab(0);
+        delete page;
+    }
+
+    for (const std::string& display_name : names)
     {
         DeviceSettingsPage *page = new DeviceSettingsPage(plugin, display_name, this);
         ui->deviceTabWidget->addTab(page, QString::fromStdString(display_name));

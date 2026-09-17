@@ -344,6 +344,9 @@ private:
                 return;
             }
 
+            // Pair the predicate transition with the waiter's mutex; otherwise
+            // the last notification can be lost between its check and wait.
+            std::lock_guard<std::mutex> lock(context_->idle_mutex);
             if (context_->active_calls.fetch_sub(1, std::memory_order_acq_rel) == 1)
             {
                 context_->idle_condition.notify_all();

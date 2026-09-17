@@ -12,6 +12,7 @@
 #include "HardwareSensorManager.h"
 #include "PixelScreenTab.h"
 #include <QFile>
+#include <QSaveFile>
 #include <QDateTime>
 #include <QTime>
 #include <QDir>
@@ -70,10 +71,6 @@ void PixelScreenPlugin::Load(OpenRGBPluginAPIInterface* api_interface_ptr)
     LoadSettings();
     LOG_INFO("[PixelScreenPlugin] LoadSettings completed\n");
 
-    // Rebuild active device matrix zones list
-    UpdateControllers();
-    LOG_INFO("[PixelScreenPlugin] UpdateControllers completed\n");
-
     // Initialize hardware sensor manager BEFORE creating UI so
     // DeviceSettingsPage constructors can connect to its signals
     sensor_manager = new HardwareSensorManager(this);
@@ -82,6 +79,21 @@ void PixelScreenPlugin::Load(OpenRGBPluginAPIInterface* api_interface_ptr)
     connect(sensor_timer, &QTimer::timeout, this, &PixelScreenPlugin::OnSensorTimerTimeout);
     sensor_timer->start();
     LOG_INFO("[PixelScreenPlugin] HardwareSensorManager initialized\n");
+
+    save_timer = new QTimer(this);
+    save_timer->setSingleShot(true);
+    save_timer->setInterval(300);
+    connect(save_timer, &QTimer::timeout, this, &PixelScreenPlugin::SaveSettings);
+
+    // Publish callbacks only after all render dependencies exist.
+    loaded = true;
+    UpdateControllers();
+    // API5 has no lifetime-safe subscription for zone layout changes. Refresh
+    // owned snapshots on the GUI thread, outside the device's AccessMutex.
+    controller_timer = new QTimer(this);
+    controller_timer->setInterval(1000);
+    connect(controller_timer, &QTimer::timeout, this, &PixelScreenPlugin::UpdateControllers);
+    controller_timer->start();
 
     // Create settings tab UI (DeviceSettingsPage constructors will find sensor_manager ready)
     ui = new PixelScreenTab(this);
@@ -104,6 +116,9 @@ QMenu* PixelScreenPlugin::GetTrayMenu()
 
 void PixelScreenPlugin::Unload()
 {
+    loaded = false;
+    if (controller_timer) controller_timer->stop();
+    if (save_timer) save_timer->stop();
     LOG_INFO("[PixelScreenPlugin] Unloading\n");
 
     // Stop all new render callbacks and wait for in-flight device sends
@@ -170,6 +185,7 @@ void PixelScreenPlugin::SettingsManagerUpdated(unsigned int /*update_reason*/)
 \*---------------------------------------------------------*/
 void PixelScreenPlugin::UpdateControllers()
 {
+    if (!loaded) return;
     std::vector<MatrixZoneTarget> new_matrix_zones;
     std::vector<RGBControllerInterface*> controllers_to_hook;
 
@@ -187,6 +203,8 @@ void PixelScreenPlugin::UpdateControllers()
                 target.controller = controller;
                 target.zone_idx = zone_idx;
                 target.display_name = controller->GetName() + " - " + controller->GetZoneName(zone_idx);
+                target.matrix_map = controller->GetZoneMatrixMap(zone_idx);
+                target.start_idx = controller->GetZoneStartIndex(zone_idx);
                 
                 new_matrix_zones.push_back(std::move(target));
                 has_matrix_zone = true;
@@ -427,20 +445,24 @@ void PixelScreenPlugin::LoadSettings()
 
 void PixelScreenPlugin::SaveSettings()
 {
-    std::lock_guard<std::mutex> settings_lock(settings_mutex);
+    MatrixTextSettings snapshot;
+    {
+        std::lock_guard<std::mutex> settings_lock(settings_mutex);
+        snapshot = settings;
+    }
 
     // Create folders if they do not exist
     std::string settings_dir = (api->GetConfigurationDirectory() / "plugins" / "settings").string();
     QDir().mkpath(QString::fromStdString(settings_dir));
 
     std::string settings_path = (api->GetConfigurationDirectory() / "plugins" / "settings" / "PixelScreenSettings.json").string();
-    std::ofstream file(settings_path, std::ios::out | std::ios::binary);
-    if (file)
+    QSaveFile file(QString::fromStdString(settings_path));
+    if (file.open(QIODevice::WriteOnly))
     {
         nlohmann::json root;
         nlohmann::json devices_json;
 
-        for (const auto& pair : settings.device_settings)
+        for (const auto& pair : snapshot.device_settings)
         {
             nlohmann::json j;
             const auto& dev_s = pair.second;
@@ -469,8 +491,12 @@ void PixelScreenPlugin::SaveSettings()
         }
 
         root["devices"] = devices_json;
-        file << root.dump(4);
-        file.close();
+        const std::string data = root.dump(4);
+        if (file.write(data.data(), static_cast<qint64>(data.size())) != static_cast<qint64>(data.size())
+            || !file.commit())
+        {
+            LOG_ERROR("[PixelScreenPlugin] Failed to save settings\n");
+        }
     }
 }
 
@@ -914,16 +940,14 @@ void PixelScreenPlugin::OverlayTextOnBuffer(const MatrixZoneTarget& target,
                                             std::size_t color_count)
 {
     if (!target.controller || !colors) return;
-    const unsigned int zone_idx = target.zone_idx;
-    if (zone_idx >= target.controller->GetZoneCount()) return;
-
-    const unsigned int matrix_w  = target.controller->GetZoneMatrixMapWidth(zone_idx);
-    const unsigned int matrix_h  = target.controller->GetZoneMatrixMapHeight(zone_idx);
-    const unsigned int* map      = target.controller->GetZoneMatrixMapData(zone_idx);
-    const unsigned int start_idx = target.controller->GetZoneStartIndex(zone_idx);
+    const unsigned int matrix_w  = target.matrix_map.width;
+    const unsigned int matrix_h  = target.matrix_map.height;
+    const unsigned int* map      = target.matrix_map.map.data();
+    const unsigned int start_idx = target.start_idx;
 
     if (!map || matrix_w == 0 || matrix_h == 0) return;
-    const std::size_t map_size = static_cast<std::size_t>(matrix_w) * matrix_h;
+    const std::size_t map_size = target.matrix_map.map.size();
+    if (matrix_h > map_size / matrix_w) return;
 
     struct RenderedGlyph {
         Glyph glyph;
