@@ -18,22 +18,28 @@
 在 OpenRGB 像素屏上渲染自定义滚动文字、时钟、硬件传感器和像素艺术。
 
 # 🛠️ 下载
-## OpenRGB 1.0（插件 API 版本 5）
-- [Windows 64](https://github.com/qiangqiang101/OpenRGBPixelScreenPlugin/releases)
-- [Linux amd64](https://github.com/qiangqiang101/OpenRGBPixelScreenPlugin/releases)
-- [Linux arm64](https://github.com/qiangqiang101/OpenRGBPixelScreenPlugin/releases)
-- [Linux armhf](https://github.com/qiangqiang101/OpenRGBPixelScreenPlugin/releases)
-- [Linux i386](https://github.com/qiangqiang101/OpenRGBPixelScreenPlugin/releases)
+## OpenRGB 1.0 和 1.0+（插件 API 版本 5）
+### Gitlab
+- [Windows 64](https://gitlab.com/OpenRGBDevelopers/OpenRGBPixelScreenPlugin/-/jobs/artifacts/main/download?job=API5%20Windows%20x64)
+- [Linux amd64](https://gitlab.com/OpenRGBDevelopers/OpenRGBPixelScreenPlugin/-/jobs/artifacts/main/download?job=API5%20Linux%20amd64)
+- [Linux arm64](https://gitlab.com/OpenRGBDevelopers/OpenRGBPixelScreenPlugin/-/jobs/artifacts/main/download?job=API5%20Linux%20arm64)
+- [Linux armhf](https://gitlab.com/OpenRGBDevelopers/OpenRGBPixelScreenPlugin/-/jobs/artifacts/main/download?job=API5%20Linux%20armhf)
+- [Linux i386](https://gitlab.com/OpenRGBDevelopers/OpenRGBPixelScreenPlugin/-/jobs/artifacts/main/download?job=API5%20Linux%20i386)
+
+### GitHub
+- [Release](https://github.com/qiangqiang101/OpenRGBPixelScreenPlugin/releases)
 
 ## OpenRGB 1.0 RC - 1.0 RC3（插件 API 版本 4）
-- [Windows 86](https://github.com/qiangqiang101/OpenRGBPixelScreenPlugin/releases)
-- [Windows 64](https://github.com/qiangqiang101/OpenRGBPixelScreenPlugin/releases)
-- [Linux amd64](https://github.com/qiangqiang101/OpenRGBPixelScreenPlugin/releases)
-- [Linux arm64](https://github.com/qiangqiang101/OpenRGBPixelScreenPlugin/releases)
-- [Linux armhf](https://github.com/qiangqiang101/OpenRGBPixelScreenPlugin/releases)
-- [Linux i386](https://github.com/qiangqiang101/OpenRGBPixelScreenPlugin/releases)
+### Gitlab
+- [Windows 86](https://gitlab.com/OpenRGBDevelopers/OpenRGBPixelScreenPlugin/-/jobs/artifacts/main/download?job=API4%20Windows%20x86)
+- [Windows 64](https://gitlab.com/OpenRGBDevelopers/OpenRGBPixelScreenPlugin/-/jobs/artifacts/main/download?job=API4%20Windows%20x64)
+- [Linux amd64](https://gitlab.com/OpenRGBDevelopers/OpenRGBPixelScreenPlugin/-/jobs/artifacts/main/download?job=API4%20Linux%20amd64)
+- [Linux arm64](https://gitlab.com/OpenRGBDevelopers/OpenRGBPixelScreenPlugin/-/jobs/artifacts/main/download?job=API4%20Linux%20arm64)
+- [Linux armhf](https://gitlab.com/OpenRGBDevelopers/OpenRGBPixelScreenPlugin/-/jobs/artifacts/main/download?job=API4%20Linux%20armhf)
+- [Linux i386](https://gitlab.com/OpenRGBDevelopers/OpenRGBPixelScreenPlugin/-/jobs/artifacts/main/download?job=API4%20Linux%20i386)
 
-你可以在这里获取旧版本发布包：[GitHub Releases](https://github.com/qiangqiang101/OpenRGBPixelScreenPlugin/releases)。
+### GitHub
+- [Release](https://github.com/qiangqiang101/OpenRGBPixelScreenPlugin/releases)
 
 # ⚙️ 设置
 ## 🕔 时间 / 时钟格式
