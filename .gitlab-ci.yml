@@ -1,0 +1,193 @@
+default:
+  interruptible: true
+
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+
+stages:
+  - build
+  - release
+
+# ==============================================================================
+# Linux Builds (Docker-in-Docker with QEMU multi-architecture emulation)
+# Matches GitHub workflow: API4 (Qt5) & API5 (Qt6) across amd64, i386, arm64, armhf
+# ==============================================================================
+build:linux:
+  stage: build
+  image: docker:24.0.5
+  services:
+    - name: docker:24.0.5-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  parallel:
+    matrix:
+      # API 4 Linux
+      - API: API4
+        BUILD_DIR: API4
+        PLATFORM: linux/amd64
+        ARCH_NAME: amd64
+        QT_PACKAGE: qtbase5-dev
+        QMAKE_CMD: qmake
+      - API: API4
+        BUILD_DIR: API4
+        PLATFORM: linux/386
+        ARCH_NAME: i386
+        QT_PACKAGE: qtbase5-dev
+        QMAKE_CMD: qmake
+      - API: API4
+        BUILD_DIR: API4
+        PLATFORM: linux/arm64
+        ARCH_NAME: arm64
+        QT_PACKAGE: qtbase5-dev
+        QMAKE_CMD: qmake
+      - API: API4
+        BUILD_DIR: API4
+        PLATFORM: linux/arm/v7
+        ARCH_NAME: armhf
+        QT_PACKAGE: qtbase5-dev
+        QMAKE_CMD: qmake
+      # API 5 Linux
+      - API: API5
+        BUILD_DIR: API5
+        PLATFORM: linux/amd64
+        ARCH_NAME: amd64
+        QT_PACKAGE: qt6-base-dev
+        QMAKE_CMD: qmake6
+      - API: API5
+        BUILD_DIR: API5
+        PLATFORM: linux/386
+        ARCH_NAME: i386
+        QT_PACKAGE: qt6-base-dev
+        QMAKE_CMD: qmake6
+      - API: API5
+        BUILD_DIR: API5
+        PLATFORM: linux/arm64
+        ARCH_NAME: arm64
+        QT_PACKAGE: qt6-base-dev
+        QMAKE_CMD: qmake6
+      - API: API5
+        BUILD_DIR: API5
+        PLATFORM: linux/arm/v7
+        ARCH_NAME: armhf
+        QT_PACKAGE: qt6-base-dev
+        QMAKE_CMD: qmake6
+  before_script:
+    - if [ "$PLATFORM" != "linux/amd64" ]; then docker run --privileged --rm tonistiigi/binfmt --install all; fi
+  script:
+    - |
+      docker run --rm --platform "$PLATFORM" \
+        -e QT_PACKAGE="$QT_PACKAGE" \
+        -e QMAKE_CMD="$QMAKE_CMD" \
+        -e BUILD_DIR="$BUILD_DIR" \
+        -e DEBIAN_FRONTEND=noninteractive \
+        -v "$CI_PROJECT_DIR:/work" \
+        -w /work \
+        debian:bookworm \
+        bash -lc '
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential pkg-config "$QT_PACKAGE" libgl1-mesa-dev findutils tar
+          cd "$BUILD_DIR"
+          "$QMAKE_CMD" PixelScreenPlugin.pro "CONFIG+=release"
+          make -j"$(nproc)"
+        '
+    - |
+      set -euo pipefail
+      PACKAGE_NAME="${API}-Linux-${ARCH_NAME}"
+      PACKAGE_DIR="dist/${PACKAGE_NAME}"
+      mkdir -p "${PACKAGE_DIR}"
+      PLUGIN="$(find "${BUILD_DIR}" -name "*PixelScreenPlugin*.so" -type f | head -n 1)"
+      if [ -z "$PLUGIN" ]; then
+        PLUGIN="$(find "${BUILD_DIR}" -name "*.so" -not -path "*/OpenRGB/*" -type f | head -n 1)"
+      fi
+      if [ -n "$PLUGIN" ]; then cp "$PLUGIN" "${PACKAGE_DIR}/"; fi
+      JSON="$(find "${BUILD_DIR}" -name "PixelScreenPlugin.json" -type f | head -n 1)"
+      if [ -n "$JSON" ]; then cp "$JSON" "${PACKAGE_DIR}/"; fi
+      tar -C "${PACKAGE_DIR}" -czf "dist/${PACKAGE_NAME}.tar.gz" .
+  artifacts:
+    name: "$API-Linux-$ARCH_NAME"
+    paths:
+      - dist/$API-Linux-$ARCH_NAME.tar.gz
+    expire_in: 30 days
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+# ==============================================================================
+# Windows Builds (Requires Windows Runner with MSVC installed)
+# Matches GitHub workflow: API4 x64, API4 x86, API5 x64
+# ==============================================================================
+build:windows:
+  stage: build
+  tags:
+    - windows
+  parallel:
+    matrix:
+      - API: API4
+        ARCH: x64
+        QT_VERSION: "5.15.2"
+        QT_ARCH: win64_msvc2019_64
+        MSVC_ARCH: x64
+        BUILD_DIR: API4
+      - API: API4
+        ARCH: x86
+        QT_VERSION: "5.15.2"
+        QT_ARCH: win32_msvc2019
+        MSVC_ARCH: x86
+        BUILD_DIR: API4
+      - API: API5
+        ARCH: x64
+        QT_VERSION: "6.8.3"
+        QT_ARCH: win64_msvc2022_64
+        MSVC_ARCH: x64
+        BUILD_DIR: API5
+  script:
+    - |
+      pip install aqtinstall
+      python -m aqt install-qt windows desktop $QT_VERSION $QT_ARCH -o C:\Qt
+      $qtSubDir = $QT_ARCH -replace 'win64_','' -replace 'win32_',''
+      $env:PATH = "C:\Qt\$QT_VERSION\$qtSubDir\bin;$env:PATH"
+      
+      $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+      $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+      $vcVars = Join-Path $vsPath "VC\Auxiliary\Build\vcvarsall.bat"
+      
+      cmd /c "`"$vcVars`" $MSVC_ARCH && cd $BUILD_DIR && qmake.exe PixelScreenPlugin.pro `"CONFIG+=release`" && nmake"
+
+      $packageName = "${API}-Windows-${ARCH}"
+      $packageDir = "dist/$packageName"
+      New-Item -ItemType Directory -Force $packageDir | Out-Null
+      $dll = Get-ChildItem "$BUILD_DIR" -Recurse -File -Filter PixelScreenPlugin.dll | Select-Object -First 1
+      if (-not $dll) { $dll = Get-ChildItem "$BUILD_DIR" -Recurse -File -Filter *PixelScreenPlugin*.dll | Select-Object -First 1 }
+      if ($dll) { Copy-Item $dll.FullName $packageDir }
+      $json = Get-ChildItem "$BUILD_DIR" -Recurse -File -Filter PixelScreenPlugin.json | Select-Object -First 1
+      if ($json) { Copy-Item $json.FullName $packageDir }
+      Compress-Archive -Path "$packageDir/*" -DestinationPath "dist/$packageName.zip" -Force
+  artifacts:
+    name: "$API-Windows-$ARCH"
+    paths:
+      - dist/$API-Windows-$ARCH.zip
+    expire_in: 30 days
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+# ==============================================================================
+# Automated Release Publishing on Git Tag Push
+# ==============================================================================
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - echo "Publishing GitLab release for $CI_COMMIT_TAG"
+  release:
+    name: "Release $CI_COMMIT_TAG"
+    description: "Automated release generated for tag $CI_COMMIT_TAG"
+    tag_name: "$CI_COMMIT_TAG"
+    ref: "$CI_COMMIT_TAG"
