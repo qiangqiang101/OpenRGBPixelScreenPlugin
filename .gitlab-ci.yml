@@ -74,25 +74,57 @@ stages:
     - $WINDOWS_RUNNER_TAG
   script:
     - |
+      $ErrorActionPreference = "Stop"
+
+      # 1. Add Git Unix utilities (sed.exe needed by qmake prebuild_json) to PATH
+      if (Test-Path "C:\Program Files\Git\usr\bin") {
+        $env:PATH = "C:\Program Files\Git\usr\bin;$env:PATH"
+      }
+
+      # 2. Install Qt via aqtinstall (-O flag, uppercase)
       pip install aqtinstall
-      python -m aqt install-qt windows desktop $QT_VERSION $QT_ARCH -o C:\Qt
-      $qtSubDir = $QT_ARCH -replace 'win64_','' -replace 'win32_',''
-      $env:PATH = "C:\Qt\$QT_VERSION\$qtSubDir\bin;$env:PATH"
-      
+      python -m aqt install-qt windows desktop $QT_VERSION $QT_ARCH -O C:\Qt
+      if ($LASTEXITCODE -ne 0) { throw "aqt install-qt failed with exit code $LASTEXITCODE" }
+
+      # 3. Locate qmake.exe dynamically and add to PATH
+      $qmake = Get-ChildItem "C:\Qt\$QT_VERSION" -Recurse -Filter "qmake.exe" | Select-Object -First 1
+      if (-not $qmake) { throw "qmake.exe not found under C:\Qt\$QT_VERSION" }
+      $env:PATH = "$($qmake.DirectoryName);$env:PATH"
+
+      # 4. Locate Visual Studio vcvarsall.bat
       $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
       $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
       $vcVars = Join-Path $vsPath "VC\Auxiliary\Build\vcvarsall.bat"
-      
-      cmd /c "`"$vcVars`" $MSVC_ARCH && cd $BUILD_DIR && qmake.exe PixelScreenPlugin.pro `"CONFIG+=release`" && nmake"
+      if (-not (Test-Path $vcVars)) { throw "vcvarsall.bat not found at $vcVars" }
 
+      # 5. Build via batch file to ensure proper MSVC environment and error propagation
+      $buildBatch = @"
+      call "$vcVars" $MSVC_ARCH
+      if errorlevel 1 exit /b %errorlevel%
+      cd /d "$CI_PROJECT_DIR\$BUILD_DIR"
+      if errorlevel 1 exit /b %errorlevel%
+      qmake.exe PixelScreenPlugin.pro "CONFIG+=release"
+      if errorlevel 1 exit /b %errorlevel%
+      nmake
+      if errorlevel 1 exit /b %errorlevel%
+      "@
+      Set-Content -Path "build_plugin.bat" -Value $buildBatch
+      cmd /c "build_plugin.bat"
+      if ($LASTEXITCODE -ne 0) { throw "Build failed with exit code $LASTEXITCODE" }
+
+      # 6. Package DLL and JSON metadata
       $packageName = "${API}-Windows-${ARCH}"
       $packageDir = "dist/$packageName"
       New-Item -ItemType Directory -Force $packageDir | Out-Null
+
       $dll = Get-ChildItem "$BUILD_DIR" -Recurse -File -Filter PixelScreenPlugin.dll | Select-Object -First 1
       if (-not $dll) { $dll = Get-ChildItem "$BUILD_DIR" -Recurse -File -Filter *PixelScreenPlugin*.dll | Select-Object -First 1 }
-      if ($dll) { Copy-Item $dll.FullName $packageDir }
+      if (-not $dll) { throw "Build completed but PixelScreenPlugin.dll was not found under $BUILD_DIR!" }
+      Copy-Item $dll.FullName $packageDir
+
       $json = Get-ChildItem "$BUILD_DIR" -Recurse -File -Filter PixelScreenPlugin.json | Select-Object -First 1
       if ($json) { Copy-Item $json.FullName $packageDir }
+
       Compress-Archive -Path "$packageDir/*" -DestinationPath "dist/$packageName.zip" -Force
   artifacts:
     name: "$API-Windows-$ARCH"
